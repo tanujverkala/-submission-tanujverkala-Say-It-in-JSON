@@ -1,0 +1,37 @@
+[
+  {
+    "file": "customers\\initech\\pipeline.pfcfg",
+    "environment": "acme-approved.json",
+    "key": "signing.key_material",
+    "severity": "warning",
+    "reason": "env var 'REQUIRED_SIGNING_SECRET' unset, no default -- resolved to empty string"
+  },
+  {
+    "file": "edge-cases\\conditional-includes.pfcfg",
+    "environment": "acme-approved.json",
+    "key": "migration.api_endpoint",
+    "severity": "warning",
+    "reason": "env var 'REQUIRED_API_ENDPOINT' unset, no default -- resolved to empty string"
+  },
+  {
+    "file": "edge-cases\\conditional-includes.pfcfg",
+    "environment": "auto:7",
+    "key": "audit.ticket",
+    "severity": "warning",
+    "reason": "env var 'MIGRATION_AUDIT_TICKET' unset, no default -- resolved to empty string"
+  },
+  {
+    "file": "edge-cases\\interpolation-cascade.pfcfg",
+    "environment": "acme-approved.json",
+    "key": "cascade.loop.a",
+    "severity": "error",
+    "reason": "circular reference: cascade.loop.a -> cascade.loop.b -> cascade.loop.a"
+  },
+  {
+    "file": "edge-cases\\interpolation-cascade.pfcfg",
+    "environment": "acme-approved.json",
+    "key": "cascade.loop.b",
+    "severity": "error",
+    "reason": "circular reference: cascade.loop.b -> cascade.loop.a -> cascade.loop.b"
+  }
+]

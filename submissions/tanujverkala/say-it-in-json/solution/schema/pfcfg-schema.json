@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pipelineforge.internal/schemas/pfcfg-v1.json",
+  "title": "PipelineForge Config (converted from .pfcfg)",
+  "description": "One converted entry config. Includes are flattened at conversion time into a single, ordered 'assignments' list (static merge list). Conditionals and interpolation are kept dynamic and resolved by the evaluator at read time, against a given environment.",
+  "type": "object",
+  "required": ["entry", "sources", "assignments"],
+  "additionalProperties": false,
+  "properties": {
+    "entry": {
+      "type": "string",
+      "description": "Path to the original entry .pfcfg file, relative to starter/configs/.",
+      "examples": ["customers/globex/pipeline.pfcfg"]
+    },
+    "sources": {
+      "type": "array",
+      "description": "Every .pfcfg file flattened into this JSON, in the order they were merged (provenance only — not required for evaluation).",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "assignments": {
+      "type": "array",
+      "description": "Every key = value assignment encountered during textual macro-expansion of the include tree, in original textual order. Multiple entries may share the same section/key (e.g. one default, one conditional override) — the evaluator applies them in order, letting later assignments whose condition passes overwrite earlier ones. This is what makes last-write-wins possible without JSON key collisions.",
+      "items": { "$ref": "#/$defs/assignment" }
+    },
+    "referenced_env_vars": {
+      "type": "array",
+      "description": "Optional. Every environment variable name referenced anywhere in this config's assignments, via @ifdef/@ifndef conditions or ${VAR...} interpolation. $(section.key) cross-references are excluded (they aren't env vars). Auto-extracted by the converter; used to auto-generate test environments for verification without a human having to read the file first.",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "assignment": {
+      "type": "object",
+      "required": ["section", "key", "value", "condition", "origin", "order"],
+      "additionalProperties": false,
+      "properties": {
+        "section": {
+          "type": "string",
+          "description": "Dotted section path, exactly as in the original [section] header.",
+          "examples": ["build", "toolchain.node", "notify.slack"]
+        },
+        "key": {
+          "type": "string",
+          "description": "The key name within the section."
+        },
+        "value": {
+          "type": "string",
+          "description": "Raw value string, unresolved. May contain ${VAR}, ${VAR:-default}, ${VAR:+alt}, or $(section.key) interpolation syntax, re-parsed by the evaluator at read time. List values remain comma-joined strings (e.g. 'compile,test,build'), not JSON arrays.",
+          "examples": [
+            "${CACHE_NAMESPACE:-default}",
+            "$(toolchain.node.binary)",
+            "compile,test,package"
+          ]
+        },
+        "condition": {
+          "$ref": "#/$defs/condition"
+        },
+        "origin": {
+          "type": "object",
+          "description": "Where this assignment came from in the original .pfcfg tree, for debugging and the unmigratable report.",
+          "required": ["file", "line"],
+          "additionalProperties": false,
+          "properties": {
+            "file": { "type": "string" },
+            "line": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Monotonically increasing position of this assignment in the fully-expanded, textual, top-to-bottom token stream. Used by the evaluator to break ties when more than one candidate's condition passes for the same section.key: highest passing order wins. Assignments must be emitted by the converter with order values matching their true textual sequence across the flattened include tree."
+        }
+      }
+    },
+    "condition": {
+      "description": "Null when the assignment is unconditional. Otherwise a single ifdef/ifndef check, or a conjunction of nested conditions (for nested @ifdef/@ifndef blocks).",
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/single_condition" },
+        { "$ref": "#/$defs/conjunction_condition" }
+      ]
+    },
+    "single_condition": {
+      "type": "object",
+      "required": ["type", "var"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ifdef", "ifndef"],
+          "description": "ifdef: true when var is set and non-empty in the environment. ifndef: true when var is unset or empty."
+        },
+        "var": {
+          "type": "string",
+          "description": "Environment variable name being tested."
+        }
+      }
+    },
+    "conjunction_condition": {
+      "type": "object",
+      "required": ["all"],
+      "additionalProperties": false,
+      "properties": {
+        "all": {
+          "type": "array",
+          "description": "All nested conditions must pass. Represents nested @ifdef/@ifndef blocks (an assignment inside two wrapping conditionals).",
+          "minItems": 2,
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/single_condition" },
+              { "$ref": "#/$defs/conjunction_condition" }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

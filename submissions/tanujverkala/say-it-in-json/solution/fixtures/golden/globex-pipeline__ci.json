@@ -1,0 +1,10 @@
+{
+  "id": "globex-pipeline__ci",
+  "entry": "customers/globex/pipeline.pfcfg",
+  "environment": "ci.json",
+  "assertions": {
+    "build.retry_count": "0"
+  },
+  "expected_errors": [],
+  "reasoning": "defaults.pfcfg sets build.retry_count=1. pipeline.pfcfg directly @includes defaults.pfcfg (unconditional, first). pipeline.pfcfg then @includes environments/ci-shared.pfcfg, which internally wraps its entire body in @ifdef CI; with CI=true this fires and sets build.retry_count=0. pipeline.pfcfg then evaluates @ifndef PRODUCTION (true, PRODUCTION unset) and @includes customers/globex/overrides.pfcfg, whose first line is @include_once ../../_base/defaults.pfcfg. ASSUMPTION UNDER TEST: plain @include (not just @include_once) registers a path in the per-entry-config seen-includes set, so this @include_once is skipped as a duplicate and defaults.pfcfg is NOT re-applied. overrides.pfcfg's own body then sets build.parallel=true and build.timeout_minutes=30, but never reassigns build.retry_count. Net effect: retry_count keeps the ci-shared value of 0. If the alternate reading is correct instead (@include_once only tracks prior @include_once calls, not plain @include), defaults.pfcfg WOULD re-apply here, resetting retry_count back to 1, and nothing downstream would touch it again -- final value would be 1 under that reading. This fixture exists specifically to force that fork to surface rather than pass silently: if the evaluator produces 1 instead of 0, treat it as a signal to revisit the include_once assumption in DECISIONS.md, not as an automatic converter bug."
+}
